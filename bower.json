@@ -1,5 +1,15 @@
 {
   "name": "purescript-facebook",
+  "description": "Idiomatic Purescript bindings for the Facebook SDK",
+  "license": "Apache-2.0",
+  "keywords": "facebook purescipt",
+  "authors": [
+    "Yuriy Lazarev <unisay at gmail dot com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Unisay/purescript-facebook.git"
+  },
   "ignore": [
     "**/.*",
     "node_modules",

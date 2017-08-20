@@ -94,18 +94,18 @@ readStatusInfo value = do
   pure $ StatusInfo { status: st, authResponse: ar}
   where
     readStatus :: Foreign -> F Status
-    readStatus value = do
-      str <- readString value
+    readStatus status = do
+      str <- readString status
       case str of
         "connected"      -> pure Connected
         "not_authorized" -> pure NotAuthorized
         otherwise        -> pure Unknown
     readAuthResponse :: Foreign -> F AuthResponse
-    readAuthResponse value = do
-      at <- value ! "accessToken" >>= readString
-      ei <- value ! "expiresIn" >>= readInt
-      sr <- value ! "signedRequest" >>= readString
-      id <- value ! "userID" >>= readString
+    readAuthResponse authResponse = do
+      at <- authResponse ! "accessToken" >>= readString
+      ei <- authResponse ! "expiresIn" >>= readInt
+      sr <- authResponse ! "signedRequest" >>= readString
+      id <- authResponse ! "userID" >>= readString
       pure $ AuthResponse { accessToken: at
                           , expiresIn: ei
                           , signedRequest: sr

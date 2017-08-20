@@ -1,4 +1,15 @@
-module Facebook.Sdk where
+module Facebook.Sdk
+  ( defaultConfig
+  , Config (..)
+  , Status (..)
+  , StatusInfo (..)
+  , AuthResponse (..)
+  , Sdk
+  , AppId
+  , init
+  , loginStatus
+  , login
+  ) where
 
 import Control.Monad (bind)
 import Control.Monad.Aff (Aff, makeAff)
@@ -7,7 +18,7 @@ import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
 import Data.Either (either)
-import Data.Foreign (F, Foreign, readInt, readNullOrUndefined, readString)
+import Data.Foreign (F, Foreign, MultipleErrors, readInt, readNullOrUndefined, readString)
 import Data.Foreign.Index ((!))
 import Data.Functor (map)
 import Data.Generic (class Generic, gShow)
@@ -68,66 +79,61 @@ newtype AuthResponse = AuthResponse
   }
 
 derive instance genericAuthResponse :: Generic AuthResponse
-
 instance showAuthResponse :: Show AuthResponse where show = gShow
-
-readStatusInfo :: Foreign -> F StatusInfo
-readStatusInfo value = do
-  st <- value ! "status" >>= readStatus
-  ar <- value ! "authResponse" >>= readNullOrUndefined >>= traverse readAuthResponse
-  pure $ StatusInfo { status: st, authResponse: ar}
-
-readStatus :: Foreign -> F Status
-readStatus value = do
-  str <- readString value
-  case str of
-    "connected"      -> pure Connected
-    "not_authorized" -> pure NotAuthorized
-    otherwise        -> pure Unknown
-
-readAuthResponse :: Foreign -> F AuthResponse
-readAuthResponse value = do
-  at <- value ! "accessToken" >>= readString
-  ei <- value ! "expiresIn" >>= readInt
-  sr <- value ! "signedRequest" >>= readString
-  id <- value ! "userID" >>= readString
-  pure $ AuthResponse { accessToken: at
-                      , expiresIn: ei
-                      , signedRequest: sr
-                      , userId: id
-                      }
 
 data Sdk
 
 instance showSdk :: Show Sdk where
   show = const "[Facebook SDK]"
 
+
+readStatusInfo :: Foreign -> F StatusInfo
+readStatusInfo value = do
+  st <- value ! "status" >>= readStatus
+  ar <- value ! "authResponse" >>= readNullOrUndefined >>= traverse readAuthResponse
+  pure $ StatusInfo { status: st, authResponse: ar}
+  where
+    readStatus :: Foreign -> F Status
+    readStatus value = do
+      str <- readString value
+      case str of
+        "connected"      -> pure Connected
+        "not_authorized" -> pure NotAuthorized
+        otherwise        -> pure Unknown
+    readAuthResponse :: Foreign -> F AuthResponse
+    readAuthResponse value = do
+      at <- value ! "accessToken" >>= readString
+      ei <- value ! "expiresIn" >>= readInt
+      sr <- value ! "signedRequest" >>= readString
+      id <- value ! "userID" >>= readString
+      pure $ AuthResponse { accessToken: at
+                          , expiresIn: ei
+                          , signedRequest: sr
+                          , userId: id
+                          }
+
 -- | Initialize Facebook SDK
 -- | https://developers.facebook.com/docs/javascript/reference/.init/v2.10
 init :: ∀ e. Config -> Aff e Sdk
 init config = makeAff (\error success -> _init success config)
-
-foreign import _init :: ∀ e. (Sdk -> Eff e Unit) -> Config -> Eff e Unit
 
 -- | Retrieve a Facebook Login status
 -- | https://developers.facebook.com/docs/reference/javascript/FB.getLoginStatus
 loginStatus :: ∀ e. Sdk -> Aff e StatusInfo
 loginStatus sdk = do
   value <- makeAff (\error success -> _loginStatus sdk success)
-  either handleErrors pure $ runExcept (readStatusInfo value)
-    where handleErrors errors = let message = intercalate "; " (map show errors)
-                                in throwError (error message)
-
-foreign import _loginStatus :: ∀ e. Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit
-
+  either handleForeignErrors pure $ runExcept (readStatusInfo value)
 
 -- | Login user
 -- | https://developers.facebook.com/docs/reference/javascript/FB.login
 login :: ∀ e. Sdk -> Aff e StatusInfo
 login sdk = do
   value <- makeAff (\error success -> _login sdk success)
-  either handleErrors pure $ runExcept (readStatusInfo value)
-    where handleErrors errors = let message = intercalate "; " (map show errors)
-                                in throwError (error message)
+  either handleForeignErrors pure $ runExcept (readStatusInfo value)
 
+handleForeignErrors :: ∀ e a. MultipleErrors -> Aff e a
+handleForeignErrors errors = throwError (error $ intercalate "; " (map show errors))
+
+foreign import _init :: ∀ e. (Sdk -> Eff e Unit) -> Config -> Eff e Unit
 foreign import _login :: ∀ e. Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit
+foreign import _loginStatus :: ∀ e. Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit

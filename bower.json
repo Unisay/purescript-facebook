@@ -23,6 +23,7 @@
     "purescript-foreign": "^4.0.1"
   },
   "devDependencies": {
-    "purescript-psci-support": "^3.0.0"
+    "purescript-psci-support": "^3.0.0",
+    "purescript-karma-test-unit": "^1.1.0"
   }
 }

@@ -1,0 +1,33 @@
+{
+  "name": "purescript-facebook",
+  "version": "0.0.1",
+  "description": "Idiomatic Purescript bindings for the Facebook SDK",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "postinstall": "bower install",
+    "pretest": "pulp browserify --main 'Test.Main' -I test --to karma/index.js",
+    "test": "karma start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Unisay/purescript-facebook.git"
+  },
+  "keywords": [
+    "facebook",
+    "purescript"
+  ],
+  "author": "Yuriy Lazarev",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Unisay/purescript-facebook/issues"
+  },
+  "devDependencies": {
+    "karma": "^1.5.0",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-spec-reporter": "0.0.30"
+  },
+  "homepage": "https://github.com/Unisay/purescript-facebook#readme"
+}

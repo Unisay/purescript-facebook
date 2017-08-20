@@ -1,8 +1,11 @@
 module Facebook.Sdk
-  ( FbConfig (..)
+  ( FB
+  , FbAppId
+  , FbConfig (..)
   , FbStatusInfo (..)
   , FbStatus (..)
   , FbAuthResponse (..)
+  , defaultFacebookConfig
   , facebookInit
   , facebookLoginStatus
   ) where
@@ -14,21 +17,41 @@ import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
 import Data.Either (either)
-import Data.Functor (map)
 import Data.Foreign (F, Foreign, readNullOrUndefined, readString)
 import Data.Foreign.Index ((!))
+import Data.Functor (map)
 import Data.Generic (class Generic, gShow)
 import Data.Maybe (Maybe)
 import Data.Traversable (intercalate, traverse)
-import Prelude (class Show, Unit, pure, show, ($), (>>=))
+import Prelude (class Show, Unit, const, pure, show, ($), (>>=))
+
+type FbAppId = String
 
 newtype FbConfig = FbConfig
-  { appId            :: String
-  , version          :: String
-  , status           :: Boolean
-  , autoLogAppEvents :: Boolean
-  , xfbml            :: Boolean
-  , locale           :: String -- en_US
+  { appId                :: FbAppId
+  , version              :: String
+  , status               :: Boolean
+  , cookie               :: Boolean
+  , frictionlessRequests :: Boolean
+  , hideFlashCallback    :: Boolean
+  , autoLogAppEvents     :: Boolean
+  , xfbml                :: Boolean
+  , debug                :: Boolean
+  , locale               :: String
+  }
+
+defaultFacebookConfig :: FbAppId -> FbConfig
+defaultFacebookConfig appId = FbConfig
+  { appId                : appId
+  , version              : "v2.10"
+  , status               : false
+  , cookie               : false
+  , frictionlessRequests : false
+  , hideFlashCallback    : false
+  , autoLogAppEvents     : false
+  , xfbml                : false
+  , debug                : false
+  , locale               : "en_US"
   }
 
 derive instance genericFbConfig :: Generic FbConfig
@@ -84,20 +107,25 @@ readAuthResponse value = do
                         , userId: id
                         }
 
+data FB
+
+instance fbShow :: Show FB where
+  show = const "[Facebook SDK]"
+
 -- | Initialize Facebook SDK
--- | https://developers.facebook.com/docs/javascript/quickstart#loading
-facebookInit :: ∀ e. FbConfig -> Aff e Unit
+-- | https://developers.facebook.com/docs/javascript/reference/FB.init/v2.10
+facebookInit :: ∀ e. FbConfig -> Aff e FB
 facebookInit config = makeAff (\error success -> _fbInit success config)
 
-foreign import _fbInit :: ∀ e. (Unit -> Eff e Unit) -> FbConfig -> Eff e Unit
+foreign import _fbInit :: ∀ e. (FB -> Eff e Unit) -> FbConfig -> Eff e Unit
 
 -- | Retrieve a Facebook Login status
 -- | https://developers.facebook.com/docs/facebook-login/web#checklogin
-facebookLoginStatus :: ∀ e. Aff e FbStatusInfo
-facebookLoginStatus = do
-  value <- makeAff (\error success -> _fbGetLoginStatus success)
+facebookLoginStatus :: ∀ e. FB -> Aff e FbStatusInfo
+facebookLoginStatus fb = do
+  value <- makeAff (\error success -> _fbGetLoginStatus fb success)
   either handleErrors pure $ runExcept (readFbStatusInfo value)
     where handleErrors errors = let message = intercalate "; " (map show errors)
                                 in throwError (error message)
 
-foreign import _fbGetLoginStatus :: ∀ e. (Foreign -> Eff e Unit) -> Eff e Unit
+foreign import _fbGetLoginStatus :: ∀ e. FB -> (Foreign -> Eff e Unit) -> Eff e Unit

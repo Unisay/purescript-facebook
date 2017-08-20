@@ -9,6 +9,7 @@ Currently supported methods:
 1. [FB.init](https://developers.facebook.com/docs/javascript/reference/FB.init/v2.10)
 1. [FB.loginStatus](https://developers.facebook.com/docs/reference/javascript/FB.getLoginStatus/v2.10)
 1. [FB.login](https://developers.facebook.com/docs/reference/javascript/FB.login/v2.10)
+1. [FB.logout](https://developers.facebook.com/docs/reference/javascript/FB.logout/v2.10)
 
 Init Facebook SDK & retrieve a current login status:
 

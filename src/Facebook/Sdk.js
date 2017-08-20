@@ -20,6 +20,16 @@ exports._login = function(fb) {
   }
 }
 
+exports._logout = function(fb) {
+  return function(callback) {
+    return function() { // returns an effect
+      fb.logout(function (response) {
+        callback(response)();  // callback itself returns an effect
+      });
+    }
+  }
+}
+
 exports._init = function(callback) {
   return function(fbConfig) {
     return function() { // returns an effect

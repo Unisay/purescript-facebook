@@ -3,13 +3,18 @@ Idiomatic Purescript bindings for the Facebook SDK
 
 ### Disclaimer: this project is a work in progress
 
+Currently supported methods:
+1. [FB.init](https://developers.facebook.com/docs/javascript/reference/FB.init/v2.10)
+1. [FB.loginStatus](https://developers.facebook.com/docs/reference/javascript/FB.getLoginStatus/v2.10)
+1. [FB.login](https://developers.facebook.com/docs/reference/javascript/FB.login/v2.10)
+
 Init Facebook SDK & retrieve a current login status:
 
 ``` purescript
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (logShow)
 import Control.Monad.Eff.Console (CONSOLE)
-import Facebook.Sdk (Config(Config), init, loginStatus) as FB
+import Facebook.Sdk (init, loginStatus, defaultConfig) as FB
 
 initFacebook :: ∀ e. Aff (console :: CONSOLE | e) Unit
 initFacebook = do

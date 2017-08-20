@@ -1,13 +1,13 @@
 module Facebook.Sdk
-  ( FB
-  , FbAppId
-  , FbConfig (..)
-  , FbStatusInfo (..)
-  , FbStatus (..)
-  , FbAuthResponse (..)
-  , defaultFacebookConfig
-  , facebookInit
-  , facebookLoginStatus
+  ( Sdk
+  , AppId
+  , Config (..)
+  , StatusInfo (..)
+  , Status (..)
+  , AuthResponse (..)
+  , defaultConfig
+  , init
+  , loginStatus
   ) where
 
 import Control.Monad (bind)
@@ -25,23 +25,23 @@ import Data.Maybe (Maybe)
 import Data.Traversable (intercalate, traverse)
 import Prelude (class Show, Unit, const, pure, show, ($), (>>=))
 
-type FbAppId = String
+type AppId = String
 
-newtype FbConfig = FbConfig
-  { appId                :: FbAppId
+newtype Config = Config
+  { appId                :: AppId
   , version              :: String
   , status               :: Boolean
   , cookie               :: Boolean
   , frictionlessRequests :: Boolean
   , hideFlashCallback    :: Boolean
   , autoLogAppEvents     :: Boolean
-  , xfbml                :: Boolean
+  , xml                :: Boolean
   , debug                :: Boolean
   , locale               :: String
   }
 
-defaultFacebookConfig :: FbAppId -> FbConfig
-defaultFacebookConfig appId = FbConfig
+defaultConfig :: AppId -> Config
+defaultConfig appId = Config
   { appId                : appId
   , version              : "v2.10"
   , status               : false
@@ -49,83 +49,83 @@ defaultFacebookConfig appId = FbConfig
   , frictionlessRequests : false
   , hideFlashCallback    : false
   , autoLogAppEvents     : false
-  , xfbml                : false
+  , xml                : false
   , debug                : false
   , locale               : "en_US"
   }
 
-derive instance genericFbConfig :: Generic FbConfig
-instance showFbConfig :: Show FbConfig where show = gShow
+derive instance genericConfig :: Generic Config
+instance showConfig :: Show Config where show = gShow
 
-data FbStatus = Connected | NotAuthorized | Unknown
+data Status = Connected | NotAuthorized | Unknown
 
-derive instance genericFbStatus :: Generic FbStatus
-instance showFbStatus :: Show FbStatus where show = gShow
+derive instance genericStatus :: Generic Status
+instance showStatus :: Show Status where show = gShow
 
-newtype FbStatusInfo = FbStatusInfo
-  { status       :: FbStatus
-  , authResponse :: Maybe FbAuthResponse
+newtype StatusInfo = StatusInfo
+  { status       :: Status
+  , authResponse :: Maybe AuthResponse
   }
 
-derive instance genericFbStatusInfo :: Generic FbStatusInfo
-instance showFbStatusInfo :: Show FbStatusInfo where show = gShow
+derive instance genericStatusInfo :: Generic StatusInfo
+instance showStatusInfo :: Show StatusInfo where show = gShow
 
-newtype FbAuthResponse = FbAuthResponse
+newtype AuthResponse = AuthResponse
   { accessToken   :: String
   , expiresIn     :: String
   , signedRequest :: String
   , userId        :: String
   }
 
-derive instance genericFbAuthResponse :: Generic FbAuthResponse
+derive instance genericAuthResponse :: Generic AuthResponse
 
-instance showFbAuthResponse :: Show FbAuthResponse where show = gShow
+instance showAuthResponse :: Show AuthResponse where show = gShow
 
-readFbStatusInfo :: Foreign -> F FbStatusInfo
-readFbStatusInfo value = do
-  st <- value ! "status" >>= readFbStatus
+readStatusInfo :: Foreign -> F StatusInfo
+readStatusInfo value = do
+  st <- value ! "status" >>= readStatus
   ar <- value ! "authResponse" >>= readNullOrUndefined >>= traverse readAuthResponse
-  pure $ FbStatusInfo { status: st, authResponse: ar}
+  pure $ StatusInfo { status: st, authResponse: ar}
 
-readFbStatus :: Foreign -> F FbStatus
-readFbStatus value = do
+readStatus :: Foreign -> F Status
+readStatus value = do
   str <- readString value
   case str of
     "connected"      -> pure Connected
     "not_authorized" -> pure NotAuthorized
     otherwise        -> pure Unknown
 
-readAuthResponse :: Foreign -> F FbAuthResponse
+readAuthResponse :: Foreign -> F AuthResponse
 readAuthResponse value = do
   at <- value ! "accessToken" >>= readString
   ei <- value ! "expiresIn" >>= readString -- TODO: proper type
   sr <- value ! "signedRequest" >>= readString
   id <- value ! "userID" >>= readString
-  pure $ FbAuthResponse { accessToken: at
+  pure $ AuthResponse { accessToken: at
                         , expiresIn: ei
                         , signedRequest: sr
                         , userId: id
                         }
 
-data FB
+data Sdk
 
-instance fbShow :: Show FB where
+instance showSdk :: Show Sdk where
   show = const "[Facebook SDK]"
 
 -- | Initialize Facebook SDK
--- | https://developers.facebook.com/docs/javascript/reference/FB.init/v2.10
-facebookInit :: ∀ e. FbConfig -> Aff e FB
-facebookInit config = makeAff (\error success -> _fbInit success config)
+-- | https://developers.facebook.com/docs/javascript/reference/.init/v2.10
+init :: ∀ e. Config -> Aff e Sdk
+init config = makeAff (\error success -> _init success config)
 
-foreign import _fbInit :: ∀ e. (FB -> Eff e Unit) -> FbConfig -> Eff e Unit
+foreign import _init :: ∀ e. (Sdk -> Eff e Unit) -> Config -> Eff e Unit
 
 -- | Retrieve a Facebook Login status
 -- | https://developers.facebook.com/docs/facebook-login/web#checklogin
-facebookLoginStatus :: ∀ e. FB -> Aff e FbStatusInfo
-facebookLoginStatus fb = do
-  value <- makeAff (\error success -> _fbGetLoginStatus fb success)
-  either handleErrors pure $ runExcept (readFbStatusInfo value)
+loginStatus :: ∀ e. Sdk -> Aff e StatusInfo
+loginStatus sdk = do
+  value <- makeAff (\error success -> _loginStatus sdk success)
+  either handleErrors pure $ runExcept (readStatusInfo value)
     where handleErrors errors = let message = intercalate "; " (map show errors)
                                 in throwError (error message)
 
-foreign import _fbGetLoginStatus :: ∀ e. FB -> (Foreign -> Eff e Unit) -> Eff e Unit
+foreign import _loginStatus :: ∀ e. Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit

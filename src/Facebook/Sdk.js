@@ -1,6 +1,6 @@
 "use strict";
 
-exports._fbGetLoginStatus = function(fb) {
+exports._loginStatus = function(fb) {
   return function(callback) {
     return function() { // returns an effect
       fb.getLoginStatus(function(response) {
@@ -10,7 +10,7 @@ exports._fbGetLoginStatus = function(fb) {
   }
 }
 
-exports._fbInit = function(callback) {
+exports._init = function(callback) {
   return function(fbConfig) {
     return function() { // returns an effect
       window.fbAsyncInit = function() {

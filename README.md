@@ -1,6 +1,8 @@
 # purescript-facebook
 Idiomatic Purescript bindings for the Facebook SDK
 
+[![Build Status](https://travis-ci.org/Unisay/purescript-facebook.svg?branch=master)](https://travis-ci.org/Unisay/purescript-facebook)
+
 ### Disclaimer: this project is a work in progress
 
 Currently supported methods:

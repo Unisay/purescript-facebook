@@ -27,3 +27,8 @@ Outputs to the console:
 ```
 Facebook.Sdk.FbStatusInfo {authResponse: Data.Maybe.Nothing, status: Facebook.Sdk.NotAuthorized}
 ```
+
+### Installation
+```
+bower install purescript-facebook --save
+```

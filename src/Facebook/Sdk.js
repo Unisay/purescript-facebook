@@ -10,12 +10,14 @@ exports._loginStatus = function(fb) {
   }
 }
 
-exports._login = function(fb) {
-  return function(callback) {
-    return function() { // returns an effect
-      fb.login(function (response) {
-        callback(response)();  // callback itself returns an effect
-      });
+exports._login = function(opts) {
+  return function(fb) {
+    return function(callback) {
+      return function() { // returns an effect
+        fb.login(function (response) {
+          callback(response)();  // callback itself returns an effect
+        }, opts);
+      }
     }
   }
 }
@@ -27,6 +29,14 @@ exports._logout = function(fb) {
         callback(response)();  // callback itself returns an effect
       });
     }
+  }
+}
+
+exports._api = function(fb, path, method, params, callback) {
+  return function() { // returns an effect
+    fb.api(path, method, params, function (response) {
+      callback(response)();  // callback itself returns an effect
+    });
   }
 }
 

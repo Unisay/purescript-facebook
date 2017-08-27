@@ -4,6 +4,7 @@
 .psci
 /output/
 /.pulp-cache/
+/.idea/
 /karma/
 /generated-docs/
 /.psc*

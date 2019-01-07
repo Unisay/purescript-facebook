@@ -25,30 +25,32 @@ module Facebook.Sdk
   , userInfo
   ) where
 
-import Control.Monad (bind, (<#>), (<$>), (<*>), (=<<))
-import Control.Monad.Aff (Aff, makeAff)
-import Control.Monad.Eff (Eff, kind Effect)
-import Control.Monad.Eff.Exception (error)
+import Prelude
+
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
 import Data.Array (zip)
 import Data.Either (Either(..), either, note)
 import Data.FoldableWithIndex (foldWithIndexM)
-import Data.Foreign (F, Foreign, MultipleErrors, readInt, readNullOrUndefined, readString)
-import Data.Foreign.Class (class Encode, encode)
-import Data.Foreign.Index ((!))
-import Data.Foreign.Keys (keys)
 import Data.Function.Uncurried (Fn5, runFn5)
-import Data.Functor (map)
-import Data.Generic (class Generic, gShow)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Map as M
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Data.StrMap as SM
 import Data.String (joinWith, toLower)
 import Data.Traversable (intercalate, traverse)
 import Data.Tuple (Tuple(..))
-import Prelude (class Eq, class Ord, class Show, Unit, const, pure, show, ($), (<<<), (<>), (>>=), (>>>))
+import Effect (Effect)
+import Effect.Aff (Aff)
+import Effect.Aff as Aff
+import Effect.Exception (error)
+import Effect.Exception as Exception
+import Foreign (F, Foreign, MultipleErrors, readInt, readNullOrUndefined, readString)
+import Foreign.Class (class Encode, encode)
+import Foreign.Index ((!))
+import Foreign.Keys (keys)
+import Foreign.Object as SM
 
 type AppId = String
 
@@ -68,7 +70,7 @@ newtype Config = Config
 defaultConfig :: AppId -> Config
 defaultConfig appId = Config
   { appId                : appId
-  , version              : "v2.10"
+  , version              : "v3.1"
   , status               : false
   , cookie               : false
   , frictionlessRequests : false
@@ -80,14 +82,14 @@ defaultConfig appId = Config
   }
 
 derive instance eqConfig :: Eq Config
-derive instance genericConfig :: Generic Config
-instance showConfig :: Show Config where show = gShow
+derive instance genericConfig :: Generic Config _
+instance showConfig :: Show Config where show = genericShow
 
 data Status = Connected | NotAuthorized | Unknown
 
 derive instance eqStatus :: Eq Status
-derive instance genericStatus :: Generic Status
-instance showStatus :: Show Status where show = gShow
+derive instance genericStatus :: Generic Status _
+instance showStatus :: Show Status where show = genericShow
 
 newtype StatusInfo = StatusInfo
   { status       :: Status
@@ -95,30 +97,30 @@ newtype StatusInfo = StatusInfo
   }
 
 derive instance eqStatusInfo :: Eq StatusInfo
-derive instance genericStatusInfo :: Generic StatusInfo
-instance showStatusInfo :: Show StatusInfo where show = gShow
+derive instance genericStatusInfo :: Generic StatusInfo _
+instance showStatusInfo :: Show StatusInfo where show = genericShow
 
 newtype AccessToken = AccessToken String
 derive newtype instance eqAccessToken :: Eq AccessToken
 derive newtype instance showAccessToken :: Show AccessToken
 derive newtype instance encodeAccessToken :: Encode AccessToken
-derive instance genericAccessToken :: Generic AccessToken
+derive instance genericAccessToken :: Generic AccessToken _
 
 newtype UserId = UserId String
 derive newtype instance eqUserId :: Eq UserId
 derive newtype instance showUserId :: Show UserId
 derive newtype instance encodeUserId :: Encode UserId
-derive instance genericUserId :: Generic UserId
+derive instance genericUserId :: Generic UserId _
 
 newtype UserName = UserName String
 derive newtype instance eqUserName :: Eq UserName
 derive newtype instance showUserName :: Show UserName
-derive instance genericUserName :: Generic UserName
+derive instance genericUserName :: Generic UserName _
 
 newtype UserEmail = UserEmail String
 derive newtype instance eqUserEmail :: Eq UserEmail
 derive newtype instance showUserEmail :: Show UserEmail
-derive instance genericUserEmail :: Generic UserEmail
+derive instance genericUserEmail :: Generic UserEmail _
 
 newtype AuthResponse = AuthResponse
   { accessToken   :: AccessToken
@@ -128,12 +130,12 @@ newtype AuthResponse = AuthResponse
   }
 
 derive instance eqAuthResponse :: Eq AuthResponse
-derive instance genericAuthResponse :: Generic AuthResponse
-instance showAuthResponse :: Show AuthResponse where show = gShow
+derive instance genericAuthResponse :: Generic AuthResponse _
+instance showAuthResponse :: Show AuthResponse where show = genericShow
 
 data Field = Id | Name | Email | Gender | Birthday
 derive instance eqField :: Eq Field
-derive instance genericField :: Generic Field
+derive instance genericField :: Generic Field _
 derive instance ordField :: Ord Field
 instance showField :: Show Field where
   show Id = "Id"
@@ -200,7 +202,7 @@ readStatusInfo value = do
                           , userId: id
                           }
 
-type SMap = SM.StrMap String
+type SMap = SM.Object String
 
 readSMap :: Foreign -> F SMap
 readSMap value = do
@@ -209,22 +211,26 @@ readSMap value = do
   pure $ SM.fromFoldable (zip ks vs)
 
 -- | Initialize Facebook SDK
-init :: ∀ e. Config -> Aff e Sdk
-init config = makeAff (\error success -> _init success config)
+init :: Config -> Aff Sdk
+init config = Aff.makeAff \callback -> do
+  Exception.catchException
+    (callback <<< Left)
+    (_init (callback <<< Right) config)
+  pure Aff.nonCanceler
 
 -- | Retrieve a Facebook Login status
-loginStatus :: ∀ e. Sdk -> Aff e StatusInfo
+loginStatus :: Sdk -> Aff StatusInfo
 loginStatus = returnStatusInfo _loginStatus
 
 -- | Login user
-login :: ∀ e. LoginOptions -> Sdk -> Aff e StatusInfo
+login :: LoginOptions -> Sdk -> Aff StatusInfo
 login opts = returnStatusInfo $ _login (encode opts)
 
 -- | Logout user
-logout :: ∀ e. Sdk -> Aff e StatusInfo
+logout :: Sdk -> Aff StatusInfo
 logout = returnStatusInfo _logout
 
-userInfo :: ∀ e. AccessToken -> Sdk -> Aff e UserInfo
+userInfo :: AccessToken -> Sdk -> Aff UserInfo
 userInfo token sdk = me [Id, Name, Email] token sdk >>= \m ->
   either missingField pure $ do
     id <- note "id" (UserId <$> M.lookup Id m)
@@ -236,7 +242,7 @@ userInfo token sdk = me [Id, Name, Email] token sdk >>= \m ->
 
 -- | Get information about logged user
 -- | https://developers.facebook.com/docs/graph-api/overview#step3
-me :: ∀ e. Array Field -> AccessToken -> Sdk -> Aff e (M.Map Field String)
+me :: Array Field -> AccessToken -> Sdk -> Aff (M.Map Field String)
 me fields token sdk = transFields =<< api sdk token Get "/me" (requestFields fields)
   where transFields m = either (throwError <<< error) pure $ foldWithIndexM transField M.empty m
         transField key map val = (\k v -> M.insert k v map) <$> readField key <*> Right val
@@ -251,54 +257,62 @@ type ApiMethodF = Foreign
 
 data ApiMethod = Get | Post | Delete
 derive instance eqApiMethod :: Eq ApiMethod
-derive instance genericApiMethod :: Generic ApiMethod
-instance showApiMethod :: Show ApiMethod where show = gShow
+derive instance genericApiMethod :: Generic ApiMethod _
+instance showApiMethod :: Show ApiMethod where show = genericShow
 
 instance encodeApiMethod :: Encode ApiMethod where
   encode Get = encode "get"
   encode Post = encode "post"
   encode Delete = encode "delete"
 
-api :: ∀ e. Sdk
+api :: Sdk
     -> AccessToken
     -> ApiMethod
     -> ApiPath
     -> ApiParams
-    -> Aff e SMap
+    -> Aff SMap
 api sdk (AccessToken token) method path params = do
   let path' = encode path
   let method' = encode method
   let params' = encode $ SM.insert "access_token" token params
-  value <- makeAff (\_ cb -> runFn5 _api sdk path' method' params' cb)
+  value <- Aff.makeAff \callback -> do
+    Exception.catchException
+      (callback <<< Left)
+      (runFn5 _api sdk path' method' params' (callback <<< Right))
+    pure Aff.nonCanceler
   let prefix = "Facebook graph api call (" <> (show method) <> " "
                                            <> (show path)   <> ") error"
   either (handleForeignErrors prefix) pure $ runExcept (readSMap value)
 
-returnStatusInfo :: ∀ e. (Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit)
+returnStatusInfo :: (Sdk -> (Foreign -> Effect Unit) -> Effect Unit)
                  -> Sdk
-                 -> Aff e StatusInfo
+                 -> Aff StatusInfo
 returnStatusInfo f sdk = do
-  value <- makeAff (\_ success -> f sdk success)
+  value <- Aff.makeAff \callback -> do
+    Exception.catchException
+      (callback <<< Left)
+      (f sdk (callback <<< Right))
+    pure Aff.nonCanceler
   either (handleForeignErrors "Facebook status info") pure $
     runExcept (readStatusInfo value)
 
 -- | String is an error message prefix
-handleForeignErrors :: ∀ e a. String -> MultipleErrors -> Aff e a
+handleForeignErrors :: forall a. String -> MultipleErrors -> Aff a
 handleForeignErrors prefix errors =
   let message = prefix <> ": " <> intercalate "; " (map show errors)
   in throwError $ error message
 
 -- | https://developers.facebook.com/docs/javascript/reference/.init/v2.10
-foreign import _init :: ∀ e. (Sdk -> Eff e Unit) -> Config -> Eff e Unit
+foreign import _init :: (Sdk -> Effect Unit) -> Config -> Effect Unit
 
 -- | https://developers.facebook.com/docs/reference/javascript/FB.login
-foreign import _login :: ∀ e. Foreign -> Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit
+foreign import _login :: Foreign -> Sdk -> (Foreign -> Effect Unit) -> Effect Unit
 
 -- | https://developers.facebook.com/docs/reference/javascript/FB.logout
-foreign import _logout :: ∀ e. Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit
+foreign import _logout :: Sdk -> (Foreign -> Effect Unit) -> Effect Unit
 
 -- | https://developers.facebook.com/docs/reference/javascript/FB.getLoginStatus
-foreign import _loginStatus :: ∀ e. Sdk -> (Foreign -> Eff e Unit) -> Eff e Unit
+foreign import _loginStatus :: Sdk -> (Foreign -> Effect Unit) -> Effect Unit
 
 -- | https://developers.facebook.com/docs/javascript/reference/FB.api/
-foreign import _api :: ∀ e. Fn5 Sdk ApiPathF ApiMethodF ApiParamsF (Foreign -> Eff e Unit) (Eff e Unit)
+foreign import _api :: Fn5 Sdk ApiPathF ApiMethodF ApiParamsF (Foreign -> Effect Unit) (Effect Unit)

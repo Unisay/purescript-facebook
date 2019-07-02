@@ -237,8 +237,9 @@ userInfo token sdk = me [Id, Name, Email] token sdk >>= \m ->
     name <- note "name" (UserName <$> M.lookup Name m)
     email <- note "email" (UserEmail <$> M.lookup Email m)
     pure $ UserInfo { id, name, email }
-  where missingField s = throwError $
-    error ("Can't build Facebook user info because of missing user " <> s)
+  where
+    missingField s = throwError $
+      error ("Can't build Facebook user info because of missing user " <> s)
 
 -- | Get information about logged user
 -- | https://developers.facebook.com/docs/graph-api/overview#step3

@@ -1,12 +1,10 @@
-/.psci_modules/
 /bower_components/
 /node_modules/
-.psci
-/output/
 /.pulp-cache/
-/.idea/
-/karma/
+/output/
 /generated-docs/
+/.psc-package/
 /.psc*
 /.purs*
 /.psa*
+/.spago

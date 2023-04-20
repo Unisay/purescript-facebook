@@ -29,15 +29,16 @@ import Prelude
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Array (zip)
 import Data.Either (Either(..), either, note)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Function.Uncurried (Fn5, runFn5)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Map as M
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
+import Data.Show.Generic (genericShow)
 import Data.String (joinWith, toLower)
 import Data.Traversable (intercalate, traverse)
 import Data.Tuple (Tuple(..))
@@ -46,8 +47,7 @@ import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Exception (error)
 import Effect.Exception as Exception
-import Foreign (F, Foreign, MultipleErrors, readInt, readNullOrUndefined, readString)
-import Foreign.Class (class Encode, encode)
+import Foreign (F, Foreign, MultipleErrors, readInt, readNullOrUndefined, readString, unsafeToForeign)
 import Foreign.Index ((!))
 import Foreign.Keys (keys)
 import Foreign.Object as SM
@@ -103,13 +103,13 @@ instance showStatusInfo :: Show StatusInfo where show = genericShow
 newtype AccessToken = AccessToken String
 derive newtype instance eqAccessToken :: Eq AccessToken
 derive newtype instance showAccessToken :: Show AccessToken
-derive newtype instance encodeAccessToken :: Encode AccessToken
+derive newtype instance encodeJsonAccessToken :: EncodeJson AccessToken
 derive instance genericAccessToken :: Generic AccessToken _
 
 newtype UserId = UserId String
 derive newtype instance eqUserId :: Eq UserId
 derive newtype instance showUserId :: Show UserId
-derive newtype instance encodeUserId :: Encode UserId
+derive newtype instance encodeJsonUserId :: EncodeJson UserId
 derive instance genericUserId :: Generic UserId _
 
 newtype UserName = UserName String
@@ -169,9 +169,9 @@ derive instance newtypeScope :: Newtype Scope _
 newtype LoginOptions = LoginOptions
   { scopes :: Array Scope
   }
-instance encodeLoginOptions :: Encode LoginOptions where
-  encode (LoginOptions { scopes: sx }) =
-    encode $ SM.fromFoldable [Tuple "scope" (encode $ joinWith "," (map unwrap sx))]
+instance encodeLoginOptions :: EncodeJson LoginOptions where
+  encodeJson (LoginOptions { scopes: sx }) =
+    encodeJson $ SM.fromFoldable [Tuple "scope" (encodeJson $ joinWith "," (map unwrap sx))]
 
 instance showSdk :: Show Sdk where
   show = const "[Facebook SDK]"
@@ -189,7 +189,7 @@ readStatusInfo value = do
       case str of
         "connected"      -> pure Connected
         "not_authorized" -> pure NotAuthorized
-        otherwise        -> pure Unknown
+        _        ->         pure Unknown
     readAuthResponse :: Foreign -> F AuthResponse
     readAuthResponse authResponse = do
       at <- authResponse ! "accessToken" >>= readString <#> AccessToken
@@ -224,7 +224,7 @@ loginStatus = returnStatusInfo _loginStatus
 
 -- | Login user
 login :: LoginOptions -> Sdk -> Aff StatusInfo
-login opts = returnStatusInfo $ _login (encode opts)
+login opts = returnStatusInfo $ _login (unsafeToForeign $ encodeJson opts)
 
 -- | Logout user
 logout :: Sdk -> Aff StatusInfo
@@ -237,8 +237,7 @@ userInfo token sdk = me [Id, Name, Email] token sdk >>= \m ->
     name <- note "name" (UserName <$> M.lookup Name m)
     email <- note "email" (UserEmail <$> M.lookup Email m)
     pure $ UserInfo { id, name, email }
-  where missingField s = throwError $
-    error ("Can't build Facebook user info because of missing user " <> s)
+  where missingField s = throwError $ error ("Can't build Facebook user info because of missing user " <> s)
 
 -- | Get information about logged user
 -- | https://developers.facebook.com/docs/graph-api/overview#step3
@@ -260,10 +259,10 @@ derive instance eqApiMethod :: Eq ApiMethod
 derive instance genericApiMethod :: Generic ApiMethod _
 instance showApiMethod :: Show ApiMethod where show = genericShow
 
-instance encodeApiMethod :: Encode ApiMethod where
-  encode Get = encode "get"
-  encode Post = encode "post"
-  encode Delete = encode "delete"
+instance encodeApiMethod :: EncodeJson ApiMethod where
+  encodeJson Get = encodeJson "get"
+  encodeJson Post = encodeJson "post"
+  encodeJson Delete = encodeJson "delete"
 
 api :: Sdk
     -> AccessToken
@@ -272,9 +271,9 @@ api :: Sdk
     -> ApiParams
     -> Aff SMap
 api sdk (AccessToken token) method path params = do
-  let path' = encode path
-  let method' = encode method
-  let params' = encode $ SM.insert "access_token" token params
+  let path' = unsafeToForeign $ encodeJson path
+  let method' = unsafeToForeign $ encodeJson method
+  let params' = unsafeToForeign $ encodeJson $ SM.insert "access_token" token params
   value <- Aff.makeAff \callback -> do
     Exception.catchException
       (callback <<< Left)
